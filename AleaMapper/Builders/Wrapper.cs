@@ -89,6 +89,23 @@ namespace Tex.Builders
 			}
 		}
 
+		public void WithResolver<T, TG>(Expression<Func<TResult, T>> resultMember, Func<TSource, TG> sourceResolver) where T : TG
+		{
+			var member = resultMember.Body as MemberExpression;
+			if (member != null)
+			{
+				var map = _mapMembers.FirstOrDefault(x => x.MemberDestination == member.Member);
+				if (map == null)
+					throw new Exception(string.Format("Result parameter is not member of {0}", typeof(TResult)));
+				if(!sourceResolver.Method.IsStatic)
+					throw new Exception(string.Format("Func resolver should be STATIC!"));
+
+				var callExp = Expression.Call(sourceResolver.Method, _instance);
+				map.MapExpression = callExp;
+				map.StateOfMapMember = StateOfMapMember.PrivateMethodMap;
+			}
+		}
+
 
 		public void Ignore<T>(Expression<Func<TResult, T>> resultMember)
 		{
@@ -116,6 +133,7 @@ namespace Tex.Builders
 					case StateOfMapMember.Default:
 						exprList.Add(GenerateDefaultExpression(mapMember.MemberDestination, mapMember.MemberSource));
 						break;
+					case StateOfMapMember.PrivateMethodMap:
 					case StateOfMapMember.PrivateMap:
 						exprList.Add(GeneratePrivateExpression(mapMember.MemberDestination, mapMember.MapExpression));
 						break;

@@ -32,10 +32,10 @@ namespace Tex.Builders
 		public static TResult Map<TResult, TSource>(TSource source) where TResult : class
 		{
 			Delegate del;
-			if (DelegateDict.TryGetValue(new KeyValuePair<Type, Type>(typeof (TResult), typeof (TSource)), out del))
+			if (DelegateDict.TryGetValue(new KeyValuePair<Type, Type>(typeof(TResult), typeof(TSource)), out del))
 			{
 				var dyn = del as Func<TSource, TResult>;
-				var res =  dyn(source);
+				var res = dyn(source);
 				return res;
 			}
 			throw new Exception(string.Format("Map with {0} - {1} not exist. At First imeplment map or set default settings", typeof(TResult), typeof(TSource)));
@@ -56,7 +56,7 @@ namespace Tex.Builders
 			{
 				var key = wrapDict.Key;
 				var del =
-					typeof (IWrapper).GetMethod("Build").MakeGenericMethod(new[] {key.Value, key.Key}).Invoke(wrapDict.Value, null) as
+					typeof(IWrapper).GetMethod("Build").MakeGenericMethod(new[] { key.Value, key.Key }).Invoke(wrapDict.Value, null) as
 						Delegate;
 				DelegateDict.Add(key, del);
 			}
@@ -80,10 +80,15 @@ namespace Tex.Builders
 		{
 			_wrapper.MapFrom(_resultMember, sourceMember);
 		}
-		
+
 		public void Ignore()
 		{
 			_wrapper.Ignore(_resultMember);
+		}
+
+		public void WithResolver(Func<TSource, TG> resolver)
+		{
+			_wrapper.WithResolver(_resultMember, resolver);
 		}
 	}
 }
