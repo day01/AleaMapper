@@ -29,14 +29,19 @@ namespace Tex.Builders
 			return wrap;
 		}
 
-		public static TResult Map<TResult, TSource>(TSource source) where TResult : class
+		private delegate void CopyDelegate<TResult, in TSource>(TSource source, out TResult result);
+
+		public static TResult Map<TResult, TSource>(TSource source) where TResult : class where TSource :class
 		{
 			Delegate del;
 			if (DelegateDict.TryGetValue(new KeyValuePair<Type, Type>(typeof(TResult), typeof(TSource)), out del))
 			{
-				var dyn = del as Func<TSource, TResult>;
-				var res = dyn(source);
-				return res;
+				var dyn = del as Wrapper<TResult,TSource>.CopyDelegate;
+				if(dyn == null)
+					throw new Exception(string.Format("Delegate error on source type {0} and result type : {1}", typeof(TSource), typeof(TResult)));
+				TResult result;
+				dyn(source, out result);
+				return result;
 			}
 			throw new Exception(string.Format("Map with {0} - {1} not exist. At First imeplment map or set default settings", typeof(TResult), typeof(TSource)));
 		}
@@ -55,9 +60,9 @@ namespace Tex.Builders
 			foreach (var wrapDict in WrapperDict)
 			{
 				var key = wrapDict.Key;
-				var del =
-					typeof(IWrapper).GetMethod("Build").MakeGenericMethod(new[] { key.Value, key.Key }).Invoke(wrapDict.Value, null) as
-						Delegate;
+				dynamic obj = wrapDict.Value;
+				var del = obj.Build() as Delegate; 
+				
 				DelegateDict.Add(key, del);
 			}
 		}

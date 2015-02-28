@@ -3,21 +3,30 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using Expressive;
+using Mono.Cecil;
 using Tex.Builders.Map;
 
 namespace Tex.Builders
 {
-	public interface IWrapper
-	{
-		Type ResultType { get; set; }
-		Type SourceType { get; set; }
-		Func<TSource, TResult> Build<TSource, TResult>();
-	}
-
-	public class Wrapper<TResult, TSource>  : IWrapper
+	public interface IWrapper<TSource, TResult>
 		where TSource : class
 		where TResult : class
 	{
+		Type ResultType { get; set; }
+		Type SourceType { get; set; }
+		Wrapper<TResult, TSource>.CopyDelegate Build();
+	}
+
+	public class WrapperBase
+	{
+		//public delegate void CopyDelegate<TS, TR>(TS source, out TR result);
+	}
+	public class Wrapper<TResult, TSource> : IWrapper<TSource, TResult>
+		where TSource : class
+		where TResult : class
+	{
+		public delegate void CopyDelegate(TSource source, out TResult result);
 		private readonly ParameterExpression _instance;
 		private readonly ParameterExpression _result;
 		private readonly ConstructorInfo _resultConsturctor;
@@ -40,7 +49,7 @@ namespace Tex.Builders
 			SourceType = typeof(TSource);
 			ResultType = typeof(TResult);
 
-			_result = Expression.Parameter(ResultType, "result");
+			_result = Expression.Parameter(ResultType.MakeByRefType(), "result");
 			_instance = Expression.Parameter(SourceType, "instance");
 
 			sourceMembers.AddRange(SourceType.GetFields());
@@ -91,6 +100,9 @@ namespace Tex.Builders
 
 		public void WithResolver<T, TG>(Expression<Func<TResult, T>> resultMember, Func<TSource, TG> sourceResolver) where T : TG
 		{
+			//Niezle mozna wykorzystac
+			var dec = ExpressiveEngine.GetDecompiler();
+			var lmb = dec.Decompile(sourceResolver.Method);
 			var member = resultMember.Body as MemberExpression;
 			if (member != null)
 			{
@@ -119,7 +131,7 @@ namespace Tex.Builders
 				map.StateOfMapMember = StateOfMapMember.Ignore;
 			}
 		}
-		Func<TS, TR> IWrapper.Build<TS, TR>()
+		public CopyDelegate Build()
 		{
 			var exprList = new List<Expression>
 			{
@@ -139,15 +151,15 @@ namespace Tex.Builders
 						break;
 				}
 			}
-			exprList.Add(_result);
+			//exprList.Add(_result);
 
-			Expression block = Expression.Block(new[] { _result }, exprList);
+			Expression block = Expression.Block(exprList);
 			if (block.CanReduce)
 				block = block.Reduce();
-			var result =  Expression.Lambda<Func<TS, TR>>(block, _instance).Compile();
+			var result = Expression.Lambda<CopyDelegate>(block, _instance, _result).Compile();
 			return result;
 		}
-
+		
 		public Expression GenerateDefaultExpression(MemberInfo field, MemberInfo memberFrom)
 		{
 			var get = GetterExpression(memberFrom);
@@ -190,6 +202,12 @@ namespace Tex.Builders
 			{
 				return _parameterExpression;
 			}
+		}
+
+		private void PreProcess()
+		{
+			var a = AssemblyDefinition.CreateAssembly(new AssemblyNameDefinition("",new Version(1,1)), "", ModuleKind.Dll);
+			
 		}
 	}
 }
