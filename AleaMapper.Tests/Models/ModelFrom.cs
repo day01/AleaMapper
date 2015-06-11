@@ -15,7 +15,10 @@ namespace AleaMapper.Tests.Models
 		public int? IntNullFrom { get; set; }
 
 		public bool? BoolNullFrom { get; set; }
+
+		public int Sth { get; set; }
 	}
+
 	public class ModelTo
 	{
 		public int IntTo;
@@ -29,5 +32,7 @@ namespace AleaMapper.Tests.Models
 		public int? IntNullTo { get; set; }
 
 		public bool? BoolNullTo { get; set; }
+
+		public int Sth { get { return 7; } }
 	}
 }

@@ -3,8 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
-using Expressive;
-using Mono.Cecil;
 using Tex.Builders.Map;
 
 namespace Tex.Builders
@@ -14,7 +12,9 @@ namespace Tex.Builders
 		where TResult : class
 	{
 		Type ResultType { get; set; }
+
 		Type SourceType { get; set; }
+
 		Wrapper<TResult, TSource>.CopyDelegate Build();
 	}
 
@@ -22,22 +22,25 @@ namespace Tex.Builders
 	{
 		//public delegate void CopyDelegate<TS, TR>(TS source, out TR result);
 	}
+
 	public class Wrapper<TResult, TSource> : IWrapper<TSource, TResult>
 		where TSource : class
 		where TResult : class
 	{
 		public delegate void CopyDelegate(TSource source, out TResult result);
+
 		private readonly ParameterExpression _instance;
 		private readonly ParameterExpression _result;
 		private readonly ConstructorInfo _resultConsturctor;
 		private readonly List<MapMember> _mapMembers;
+
 		public Type ResultType { get; set; }
+
 		public Type SourceType { get; set; }
 
 		public Wrapper()
 			: this(typeof(TResult).GetConstructor(Type.EmptyTypes))
 		{
-
 		}
 
 		private Wrapper(ConstructorInfo ctor)
@@ -54,8 +57,8 @@ namespace Tex.Builders
 
 			sourceMembers.AddRange(SourceType.GetFields());
 			destinationMembers.AddRange(ResultType.GetFields());
-			sourceMembers.AddRange(SourceType.GetProperties());
-			destinationMembers.AddRange(ResultType.GetProperties());
+			sourceMembers.AddRange(SourceType.GetProperties().Where(x => x.CanRead));
+			destinationMembers.AddRange(ResultType.GetProperties().Where(x => x.CanWrite));
 
 			_resultConsturctor = ctor;
 			if (_resultConsturctor == null)
@@ -73,7 +76,7 @@ namespace Tex.Builders
 					type = prop.PropertyType;
 				else
 					throw new Exception(string.Format("Wrong type of memeber : {0}", member.Name));
-					
+
 				var memberInfo = sourceMembers.FirstOrDefault(x => x.Name == member.Name && ((x is FieldInfo && ((FieldInfo)x).FieldType == type) || (x is PropertyInfo && ((PropertyInfo)x).PropertyType == type)));
 				if (memberInfo != null)
 				{
@@ -84,7 +87,6 @@ namespace Tex.Builders
 			}
 		}
 
-
 		public void MapFrom<T, TG>(Expression<Func<TResult, T>> resultMember, Expression<Func<TSource, TG>> sourceMember) where T : TG
 		{
 			var member = resultMember.Body as MemberExpression;
@@ -92,7 +94,7 @@ namespace Tex.Builders
 			{
 				var map = _mapMembers.FirstOrDefault(x => x.MemberDestination == member.Member);
 				if (map == null)
-					throw new Exception(string.Format("Result parameter is not member of {0}", typeof(TResult)));
+					throw new Exception(string.Format("Result parameter {0} is not member of {1}", member.Member, typeof(TResult)));
 				map.MapExpression = sourceMember.Body;
 				map.StateOfMapMember = StateOfMapMember.PrivateMap;
 			}
@@ -101,15 +103,15 @@ namespace Tex.Builders
 		public void WithResolver<T, TG>(Expression<Func<TResult, T>> resultMember, Func<TSource, TG> sourceResolver) where T : TG
 		{
 			//Niezle mozna wykorzystac
-			var dec = ExpressiveEngine.GetDecompiler();
-			var lmb = dec.Decompile(sourceResolver.Method);
+			//var dec = ExpressiveEngine.GetDecompiler();
+			//var lmb = dec.Decompile(sourceResolver.Method);
 			var member = resultMember.Body as MemberExpression;
 			if (member != null)
 			{
 				var map = _mapMembers.FirstOrDefault(x => x.MemberDestination == member.Member);
 				if (map == null)
-					throw new Exception(string.Format("Result parameter is not member of {0}", typeof(TResult)));
-				if(!sourceResolver.Method.IsStatic)
+					throw new Exception(string.Format("Result parameter {0} is not member of {1}", member.Member, typeof(TResult)));
+				if (!sourceResolver.Method.IsStatic)
 					throw new Exception(string.Format("Func resolver should be STATIC!"));
 
 				var callExp = Expression.Call(sourceResolver.Method, _instance);
@@ -118,7 +120,6 @@ namespace Tex.Builders
 			}
 		}
 
-
 		public void Ignore<T>(Expression<Func<TResult, T>> resultMember)
 		{
 			var member = resultMember.Body as MemberExpression;
@@ -126,11 +127,12 @@ namespace Tex.Builders
 			{
 				var map = _mapMembers.FirstOrDefault(x => x.MemberDestination == member.Member);
 				if (map == null)
-					throw new Exception(string.Format("Result parameter is not member of {0}", typeof(TResult)));
+					return;
 
 				map.StateOfMapMember = StateOfMapMember.Ignore;
 			}
 		}
+
 		public CopyDelegate Build()
 		{
 			var exprList = new List<Expression>
@@ -145,6 +147,7 @@ namespace Tex.Builders
 					case StateOfMapMember.Default:
 						exprList.Add(GenerateDefaultExpression(mapMember.MemberDestination, mapMember.MemberSource));
 						break;
+
 					case StateOfMapMember.PrivateMethodMap:
 					case StateOfMapMember.PrivateMap:
 						exprList.Add(GeneratePrivateExpression(mapMember.MemberDestination, mapMember.MapExpression));
@@ -159,7 +162,7 @@ namespace Tex.Builders
 			var result = Expression.Lambda<CopyDelegate>(block, _instance, _result).Compile();
 			return result;
 		}
-		
+
 		public Expression GenerateDefaultExpression(MemberInfo field, MemberInfo memberFrom)
 		{
 			var get = GetterExpression(memberFrom);
@@ -204,10 +207,10 @@ namespace Tex.Builders
 			}
 		}
 
-		private void PreProcess()
-		{
-			var a = AssemblyDefinition.CreateAssembly(new AssemblyNameDefinition("",new Version(1,1)), "", ModuleKind.Dll);
-			
-		}
+		//private void PreProcess()
+		//{
+		//	var a = AssemblyDefinition.CreateAssembly(new AssemblyNameDefinition("",new Version(1,1)), "", ModuleKind.Dll);
+
+		//}
 	}
 }

@@ -15,7 +15,12 @@ namespace Tex.Builders
 			where TResult : class
 		{
 			var wrap = new Wrapper<TResult, TSource>();
-			WrapperDict.Add(new KeyValuePair<Type, Type>(wrap.ResultType, wrap.SourceType), wrap);
+			var key = new KeyValuePair<Type, Type>(wrap.ResultType, wrap.SourceType);
+			if (WrapperDict.ContainsKey(key))
+			{
+				throw new Exception(string.Format("Map with type {0} on type {1} exist!\nPlease try do not add the same type of map.", key.Key.FullName, key.Value.FullName));
+			}
+			WrapperDict.Add(key, wrap);
 			return wrap;
 		}
 
@@ -52,7 +57,7 @@ namespace Tex.Builders
 			{
 				return del as Func<TSource, TResult>;
 			}
-			throw new Exception(string.Format("Map with {0} - {1} not exist. At First imeplment map or set default settings", typeof(TResult), typeof(TSource)));
+			throw new Exception(string.Format("Map with {0} - {1} not exist. At First implement map or set default settings", typeof(TResult), typeof(TSource)));
 		}
 
 		public static void Build()
@@ -61,10 +66,14 @@ namespace Tex.Builders
 			{
 				var key = wrapDict.Key;
 				dynamic obj = wrapDict.Value;
-				var del = obj.Build() as Delegate; 
-				
+				var del = obj.Build() as Delegate;
+				if (DelegateDict.ContainsKey(key))
+				{
+					throw new Exception(string.Format("Map with type {0} on type {1} exist!\nPlease try do not add the same type of map.", key.Key.FullName, key.Value.FullName));
+				}
 				DelegateDict.Add(key, del);
 			}
+			WrapperDict.Clear();
 		}
 	}
 
